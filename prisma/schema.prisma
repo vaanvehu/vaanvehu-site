@@ -1,0 +1,269 @@
+// Prisma schema for וְאַנְוֵהוּ (Vaanvehu) — Arba Minim webshop
+// See design_handoff_vaanvehu/README.md for the source spec.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+// Catalog
+// ─────────────────────────────────────────────────────────────
+
+// "Order a complete set" — the 5 fixed sets
+model SetProduct {
+  id          String       @id // slug: special | mehudar-aa | mehudar-a | mehudar | kosher
+  nameHe      String
+  nameEn      String
+  nameFr      String
+  descHe      String
+  descEn      String
+  descFr      String
+  price       Int
+  image       String
+  includesHe  String[]
+  includesEn  String[]
+  includesFr  String[]
+  sort        Int          @default(0)
+  active      Boolean      @default(true)
+  upgrades    SetUpgrade[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model SetUpgrade {
+  id       String     @id @default(cuid())
+  setId    String
+  set      SetProduct @relation(fields: [setId], references: [id], onDelete: Cascade)
+  key      String // e.g. "kora", "hadasaa", "case"
+  nameHe   String
+  nameEn   String
+  nameFr   String
+  price    Int
+  sort     Int        @default(0)
+
+  @@unique([setId, key])
+}
+
+// Etrog type (chazon-ish / temani / moroccan / calabria)
+model EtrogType {
+  id       String  @id
+  nameHe   String
+  nameEn   String
+  nameFr   String
+  image    String
+  pitamAsk Boolean @default(true) // false for temani
+  sort     Int     @default(0)
+  active   Boolean @default(true)
+}
+
+// Grade / hiddur level, shared across etrog types (special/aa/mehudar-a/mehudar/kosher)
+model Grade {
+  id     String  @id
+  nameHe String
+  nameEn String
+  nameFr String
+  price  Int
+  sort   Int     @default(0)
+  active Boolean @default(true)
+}
+
+// Flat build-your-own products: lulav | hadas | arava | extra
+model Product {
+  id       String  @id @default(cuid())
+  category String // lulav | hadas | arava | extra
+  key      String  @unique // stable slug, e.g. "zehidi-chiani"
+  nameHe   String
+  nameEn   String
+  nameFr   String
+  price    Int
+  image    String?
+  stock    Int?
+  active   Boolean @default(true)
+  sort     Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────────────────────────
+// Fulfillment
+// ─────────────────────────────────────────────────────────────
+
+model PickupPoint {
+  id        String   @id @default(cuid())
+  nameHe    String
+  nameEn    String?
+  nameFr    String?
+  addressHe String
+  addressEn String?
+  addressFr String?
+  hoursHe   String
+  hoursEn   String?
+  hoursFr   String?
+  phone     String?
+  note      String?
+  active    Boolean  @default(true)
+  sort      Int      @default(0)
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DeliveryCity {
+  id            String                 @id @default(cuid())
+  nameHe        String
+  nameEn        String?
+  nameFr        String?
+  active        Boolean                @default(true)
+  price         Int
+  minimum       Int
+  freeOver      Int
+  sort          Int                    @default(0)
+  neighborhoods DeliveryNeighborhood[]
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+}
+
+model DeliveryNeighborhood {
+  id     String       @id @default(cuid())
+  cityId String
+  city   DeliveryCity @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  nameHe String
+  nameEn String?
+  nameFr String?
+  sort   Int          @default(0)
+}
+
+// ─────────────────────────────────────────────────────────────
+// Orders
+// ─────────────────────────────────────────────────────────────
+
+enum FulfillmentType {
+  pickup
+  delivery
+}
+
+enum PaymentMethod {
+  bit
+  paybox
+  card
+}
+
+enum PaymentStatus {
+  paid
+  unpaid
+}
+
+enum OrderStatus {
+  new
+  in_process
+  ready
+  out_for_delivery
+  delivered
+  cancelled
+}
+
+enum Lang {
+  he
+  en
+  fr
+}
+
+model Order {
+  id        String   @id @default(cuid())
+  number    String   @unique // e.g. VN-12345
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lang Lang @default(he)
+
+  customerName  String
+  customerPhone String
+  customerEmail String?
+
+  lines OrderLine[]
+  total Int
+
+  fulfillmentType FulfillmentType
+
+  pickupPointId String?
+  pickupPoint   PickupPoint? @relation(fields: [pickupPointId], references: [id])
+
+  deliveryCity         String?
+  deliveryNeighborhood String?
+  street               String?
+  house                String?
+  apt                  String?
+  floor                String?
+  addressNote          String?
+
+  paymentMethod PaymentMethod?
+  paymentStatus PaymentStatus  @default(unpaid)
+  status        OrderStatus    @default(new)
+
+  note String?
+
+  messages MessageLog[]
+
+  @@index([customerPhone])
+  @@index([status])
+  @@index([deliveryCity])
+}
+
+model OrderLine {
+  id          String  @id @default(cuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  kind        String // set | product
+  name        String // localized snapshot at time of order
+  image       String?
+  unitPrice   Int
+  qty         Int
+  extrasText  String? // "With Pitam · Kora Lulav · note text" snapshot
+  pitamChoice String? // with | without | null
+  note        String?
+}
+
+// ─────────────────────────────────────────────────────────────
+// Settings & messaging
+// ─────────────────────────────────────────────────────────────
+
+model Settings {
+  id              Int     @id @default(1)
+  businessEmail   String  @default("orders@vaanvehu.co.il")
+  whatsappNumber  String  @default("052-6665954")
+  autoSend        Boolean @default(true)
+}
+
+model MessageTemplate {
+  id      String @id // m1..m4
+  title   String
+  subject String
+  body    String
+  sort    Int    @default(0)
+}
+
+model MessageLog {
+  id         String   @id @default(cuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  channel    String // whatsapp | email
+  templateId String?
+  sentAt     DateTime @default(now())
+  byUser     String?
+}
+
+// ─────────────────────────────────────────────────────────────
+// Admin auth (very simple — single shared password, see README production notes)
+// ─────────────────────────────────────────────────────────────
+
+model AdminSession {
+  token     String   @id
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
