@@ -40,15 +40,16 @@ sudo -u postgres psql -c "CREATE DATABASE vaanvehu OWNER vaanvehu;"
 ```
 
 Then create the schema and seed the catalog (sets, Etrog types/grades, lulavim, hadassim, aravot,
-pickup points, delivery cities/neighborhoods, message templates, and a handful of demo orders so the
-admin dashboard isn't empty on first run):
+pickup points, delivery cities/neighborhoods, message templates):
 
 ```bash
 npx prisma migrate dev --name init   # first time only — creates the schema
 npm run db:seed                      # (re-)loads the catalog/settings data; safe to re-run
+npm run db:seed:demo                 # optional, local dev only — adds 8 sample orders so the admin
+                                      # dashboard isn't empty. Never run this against production.
 ```
 
-## 3. Run it
+## 3. Run it locally
 
 ```bash
 npm run dev
@@ -60,9 +61,37 @@ npm run dev
   real deployment**). The very first successful login walks you through one-time two-factor setup —
   see "Admin security" below before you go live.
 
-For a production build: `npm run build && npm run start`.
+For a production build: `npm run build && npm run start`. `npm run build` runs `prisma migrate deploy`
+and the (demo-order-free) catalog seed before building — every deploy self-migrates and self-seeds,
+nothing manual to run against the production database.
 
-## 4. What's implemented
+## 4. Deploy to Vercel + Neon (free tier, no payment gateway needed)
+
+This gets you a live HTTPS URL. Total cost: **₪0** (a custom domain, if you want one instead of the
+free `*.vercel.app` address, is the only optional paid part — roughly ₪40–80/year from a domain
+registrar).
+
+1. **Push this repo to GitHub** if it isn't already (it is, once you've merged this branch to `main`).
+2. **Vercel**: go to [vercel.com](https://vercel.com) → sign up/log in with GitHub → **Add New → Project**
+   → select this repo. Framework is auto-detected as Next.js — don't change build/output settings.
+3. **Database**: in the new project, open the **Storage** tab → **Create Database** → **Neon (Postgres)**
+   → create it. Vercel connects it and adds a `DATABASE_URL` environment variable for you automatically.
+4. **Environment variables**: still in the project settings → **Environment Variables**, add:
+   - `ADMIN_PASSWORD` — a real password, not the `vaanvehu` default.
+   - (`DATABASE_URL` is already there from step 3 — leave it.)
+5. **Deploy.** Vercel installs, runs `npm run build` (which applies the Prisma migrations and seeds the
+   catalog against the new database automatically — see above), and gives you a live URL.
+6. **First admin login**: open `https://<your-project>.vercel.app/admin`, enter the `ADMIN_PASSWORD` you
+   set, then complete the one-time 2FA enrollment shown on screen (see "Admin security" below) — do this
+   yourself, on your own phone/authenticator app.
+7. Payment gateway (Grow) can stay disconnected — the site works fully today, and the payment method
+   selected at checkout is only stored on the order until that integration is wired up later (see
+   "Production notes").
+
+Redeploying later: any push to `main` auto-deploys on Vercel and re-runs the migrate+seed step, so
+schema and catalog changes ship themselves — no separate step needed.
+
+## 5. What's implemented
 
 **Storefront** (`app/(shop)/…`): language gate → home → Complete Sets (list + detail) or Build Your
 Own Set (Etrog type → grade, Lulavim, Hadassim, Aravot & accessories) → Pitam dialog on every set/Etrog
@@ -80,7 +109,7 @@ grades, and flat products, plus per-set upgrades), customers (derived from order
 (business email, WhatsApp number, delivery cities + neighborhoods, pickup points, message templates,
 auto-send toggle).
 
-## 4a. Admin security
+## 5a. Admin security
 
 Beyond the password, admin login is hardened as follows:
 
@@ -120,7 +149,7 @@ WhatsApp/email action buttons in admin open `whatsapp://send?...` and `mailto:..
 the design — no WhatsApp/SendGrid API integration (see the handoff README's "Messaging model" and
 "Production notes" for what a real deployment should add).
 
-## 5. Project layout
+## 6. Project layout
 
 ```
 app/(shop)/…              storefront routes (language/cart/checkout are client-state, catalog data is
@@ -136,7 +165,7 @@ prisma/seed.ts             the exact catalog/pickup/delivery-city data captured 
 public/assets/             the design's product photography and composite artwork, served as-is
 ```
 
-## 6. Production notes (not implemented — see the handoff README for detail)
+## 7. Production notes (not implemented — see the handoff README for detail)
 
 - **Payments**: wire an Israeli gateway (Cardcom / Tranzila / PayPlus / Meshulam) in a hosted
   page/iframe; the app should never touch card data. Keep an idempotent order → payment-intent →
