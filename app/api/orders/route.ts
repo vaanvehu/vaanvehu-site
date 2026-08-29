@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateOrderNumber } from "@/lib/order-number";
+import { getClientIp, isOrderRateLimited, recordOrderCreated } from "@/lib/admin-auth";
+
+const MAX_LINES = 60;
+const MAX_QTY_PER_LINE = 50;
+const MAX_STRING = 300;
+const PHONE_RE = /^[0-9+\-() ]{5,20}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface OrderLineInput {
   kind: "set" | "product";
@@ -25,6 +32,11 @@ interface OrderInput {
 }
 
 export async function POST(req: NextRequest) {
+  const ip = await getClientIp();
+  if (await isOrderRateLimited(ip)) {
+    return NextResponse.json({ error: "rate_limited", message: "יותר מדי הזמנות מכתובת זו. נסו שוב מאוחר יותר." }, { status: 429 });
+  }
+
   let body: OrderInput;
   try {
     body = await req.json();
@@ -35,8 +47,23 @@ export async function POST(req: NextRequest) {
   if (!body?.customer?.name?.trim() || !body?.customer?.phone?.trim()) {
     return NextResponse.json({ error: "missing_customer" }, { status: 400 });
   }
-  if (!Array.isArray(body.lines) || body.lines.length === 0) {
+  if (body.customer.name.trim().length > MAX_STRING || !PHONE_RE.test(body.customer.phone.trim())) {
+    return NextResponse.json({ error: "invalid_customer" }, { status: 400 });
+  }
+  if (body.customer.email && !EMAIL_RE.test(body.customer.email.trim())) {
+    return NextResponse.json({ error: "invalid_email" }, { status: 400 });
+  }
+  if (!Array.isArray(body.lines) || body.lines.length === 0 || body.lines.length > MAX_LINES) {
     return NextResponse.json({ error: "empty_cart" }, { status: 400 });
+  }
+  for (const l of body.lines) {
+    if (
+      !l.name || l.name.length > MAX_STRING ||
+      !Number.isFinite(l.unitPrice) || l.unitPrice < 0 || l.unitPrice > 100000 ||
+      !Number.isInteger(l.qty) || l.qty < 1 || l.qty > MAX_QTY_PER_LINE
+    ) {
+      return NextResponse.json({ error: "invalid_line" }, { status: 400 });
+    }
   }
   if (body.fulfillment === "pickup" && !body.pickupPointId) {
     return NextResponse.json({ error: "missing_pickup_point" }, { status: 400 });
@@ -90,5 +117,6 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  await recordOrderCreated(ip);
   return NextResponse.json({ number: order.number, id: order.id, total: order.total });
 }

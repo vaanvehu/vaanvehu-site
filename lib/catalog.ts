@@ -48,6 +48,6 @@ export async function getSettings() {
   const settings = await prisma.settings.findUnique({ where: { id: 1 } });
   if (settings) return settings;
   return prisma.settings.create({
-    data: { id: 1, businessEmail: "orders@vaanvehu.co.il", whatsappNumber: "052-6665954", autoSend: true },
+    data: { id: 1, businessEmail: "vanvehu4minim@gmail.com", whatsappNumber: "052-6665954", autoSend: true },
   });
 }

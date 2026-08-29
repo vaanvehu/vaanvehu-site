@@ -7,7 +7,7 @@ import { AddCityButton, AddPickupButton } from "@/components/admin/AddButtons";
 
 export default async function AdminSettingsPage() {
   const [settings, cities, pickups, templates] = await Promise.all([
-    prisma.settings.upsert({ where: { id: 1 }, update: {}, create: { id: 1, businessEmail: "orders@vaanvehu.co.il", whatsappNumber: "052-6665954", autoSend: true } }),
+    prisma.settings.upsert({ where: { id: 1 }, update: {}, create: { id: 1, businessEmail: "vanvehu4minim@gmail.com", whatsappNumber: "052-6665954", autoSend: true } }),
     prisma.deliveryCity.findMany({ orderBy: { sort: "asc" }, include: { neighborhoods: { orderBy: { sort: "asc" } } } }),
     prisma.pickupPoint.findMany({ orderBy: { sort: "asc" } }),
     prisma.messageTemplate.findMany({ orderBy: { sort: "asc" } }),

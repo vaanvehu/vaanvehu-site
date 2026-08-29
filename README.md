@@ -56,8 +56,9 @@ npm run dev
 
 - **Storefront**: http://localhost:3000
 - **Admin**: http://localhost:3000/admin — you'll be redirected to `/admin/login`.
-  Password = the `ADMIN_PASSWORD` env var (defaults to `vaanvehu` if unset — change this before any
-  real deployment).
+  Password = the `ADMIN_PASSWORD` env var (defaults to `vaanvehu` if unset — **change this before any
+  real deployment**). The very first successful login walks you through one-time two-factor setup —
+  see "Admin security" below before you go live.
 
 For a production build: `npm run build && npm run start`.
 
@@ -78,6 +79,41 @@ deliveries grouped by city → neighborhood, catalog (edit name/price/active/ima
 grades, and flat products, plus per-set upgrades), customers (derived from orders), and settings
 (business email, WhatsApp number, delivery cities + neighborhoods, pickup points, message templates,
 auto-send toggle).
+
+## 4a. Admin security
+
+Beyond the password, admin login is hardened as follows:
+
+- **Mandatory two-factor authentication.** The first successful password entry doesn't log you in — it
+  shows a one-time TOTP secret (compatible with Google Authenticator, Authy, 1Password, etc. — enter it
+  manually, there's no QR scanner in this build) and asks you to confirm a 6-digit code before it will
+  enroll and issue a session. Every login after that asks password *then* the 6-digit code.
+- **Rate-limited / self-locking.** 5 failed attempts (password or code, combined) from the same IP
+  within 15 minutes blocks further attempts from that IP for the rest of the window — logged in
+  `RateLimitEvent`.
+- **Constant-time password check** (`lib/admin-auth.ts`, `verifyAdminPassword`) — compares SHA-256
+  digests via `crypto.timingSafeEqual` rather than `===`, so response time can't be used to guess the
+  password character-by-character.
+- **Signed-cookie sessions**, `httpOnly` + `SameSite=Lax` + `Secure` in production, 12h TTL, stored
+  server-side in `AdminSession` (so they can be revoked by deleting the row, and a stolen cookie alone
+  never reveals the token's meaning).
+- **Audit log** (`AdminActionLog`) — every login attempt (success/fail, password and TOTP steps),
+  logout, order status/payment change, and settings change is recorded with a timestamp and IP.
+- **Security headers** on every response (`next.config.ts`): a Content-Security-Policy (no inline
+  `eval`, no external script/style/font/image sources — the fonts are self-hosted so this needed no
+  exceptions), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+  `Strict-Transport-Security`, and a locked-down `Permissions-Policy`.
+- **Rate-limited public checkout too** — `/api/orders` caps at 12 orders/hour per IP and validates
+  every field's type/length/range server-side (not just in the browser), independent of the admin
+  limiter.
+
+**If you lose the authenticator** (new phone, uninstalled the app): there's no self-service reset by
+design — that would be a backdoor. Recovery is to connect to the database directly (Vercel/Neon/Supabase
+all have a SQL console) and run `DELETE FROM "AdminAuth";`, then log in again to re-enroll.
+
+**What this is not**: a multi-user system. There's still one shared admin identity (password + one TOTP
+secret), not individual staff accounts with roles — that's a real structural change (see "Production
+notes"), worth doing before more than one person needs admin access.
 
 Orders are persisted in Postgres via Prisma (`prisma/schema.prisma`). Status changes and the
 WhatsApp/email action buttons in admin open `whatsapp://send?...` and `mailto:...` links exactly as in

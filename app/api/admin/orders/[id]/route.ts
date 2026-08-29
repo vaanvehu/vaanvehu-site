@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { isAdminAuthenticated, getClientIp, logAdminAction } from "@/lib/admin-auth";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!(await isAdminAuthenticated())) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -13,5 +13,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (typeof body.note === "string") data.note = body.note;
 
   const order = await prisma.order.update({ where: { id }, data });
+  await logAdminAction("order_update", `order=${order.number} ${JSON.stringify(data)}`, await getClientIp());
   return NextResponse.json({ ok: true, order });
 }

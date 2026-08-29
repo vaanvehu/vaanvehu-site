@@ -250,7 +250,7 @@ async function main() {
   await prisma.settings.upsert({
     where: { id: 1 },
     update: {},
-    create: { id: 1, businessEmail: "orders@vaanvehu.co.il", whatsappNumber: "052-6665954", autoSend: true },
+    create: { id: 1, businessEmail: "vanvehu4minim@gmail.com", whatsappNumber: "052-6665954", autoSend: true },
   });
 
   // Demo orders, so the admin dashboard has something to show out of the box.
