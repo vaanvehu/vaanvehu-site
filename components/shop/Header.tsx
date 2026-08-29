@@ -80,10 +80,10 @@ export default function Header() {
             <Link href="/sets" onClick={() => setMenuOpen(false)} className="text-[16px]" style={{ color: "var(--color-text)" }}>{t.menuSets}</Link>
             <Link href="/build" onClick={() => setMenuOpen(false)} className="text-[16px]" style={{ color: "var(--color-text)" }}>{t.menuBuild}</Link>
             <div className="h-px" style={{ background: "var(--color-divider)" }} />
-            <a href="#" className="text-[15px] opacity-75" style={{ color: "var(--color-text)" }}>{t.accessibility}</a>
-            <a href="#" className="text-[15px] opacity-75" style={{ color: "var(--color-text)" }}>{t.terms}</a>
-            <a href="#" className="text-[15px] opacity-75" style={{ color: "var(--color-text)" }}>{t.privacy}</a>
-            <a href="#" className="text-[15px] opacity-75" style={{ color: "var(--color-text)" }}>{t.cancellations}</a>
+            <Link href="/accessibility" onClick={() => setMenuOpen(false)} className="text-[15px] opacity-75" style={{ color: "var(--color-text)" }}>{t.accessibility}</Link>
+            <Link href="/terms" onClick={() => setMenuOpen(false)} className="text-[15px] opacity-75" style={{ color: "var(--color-text)" }}>{t.terms}</Link>
+            <Link href="/privacy" onClick={() => setMenuOpen(false)} className="text-[15px] opacity-75" style={{ color: "var(--color-text)" }}>{t.privacy}</Link>
+            <Link href="/cancellations" onClick={() => setMenuOpen(false)} className="text-[15px] opacity-75" style={{ color: "var(--color-text)" }}>{t.cancellations}</Link>
             <div className="h-px" style={{ background: "var(--color-divider)" }} />
             <Link href="/admin" className="text-[15px] font-[var(--font-heading)]" style={{ color: "var(--color-accent-700)" }}>{t.adminLink}</Link>
           </div>
